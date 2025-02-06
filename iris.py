@@ -111,7 +111,6 @@ class AnalyzeIris:
         return self.iris_supervised
 
     def best_supervised(self):
-        # 行と列を入れ替え、インデックスを列に変更
         iris_supervised_T = self.iris_supervised.describe().T
         best_score = iris_supervised_T["mean"].max()
         max_method = iris_supervised_T["mean"].idxmax()
