@@ -16,12 +16,22 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC, LinearSVC
 from sklearn.tree import DecisionTreeClassifier, export_graphviz
 
+'''
+# TODO: 
+# 全体的に、コメントはgoogle Docs形式にして、type hintを追加してください。
+# 課題に入っているREADMEに詳細は書かれています。
+# また、保守や拡張性を考えて実装することを心がけてください。kfold = KFold(n_splits=5)のところなど、数字をベタ書きするのはお勧めしません。
+
+'''
 
 class AnalyzeIris:
     def __init__(self):
         # load_iris()でIrisデータセットを読み込む
         self.iris = load_iris()
         # 正解ラベルのない各特徴量のデータフレームを作成
+        # FIXME: dataframe はdfと略すことが多いのそちらにしてださい。
+        # TODO: irisという名前も抽象度が低いので、他の名前の方がいいですが..., お任せします
+
         self.iris_dataframe = pd.DataFrame(
             self.iris.data, columns=self.iris.feature_names
         )
@@ -40,6 +50,7 @@ class AnalyzeIris:
 
     def pair_plot(self, diag_kind="hist"):
         # 正解ラベルのない各特徴量のデータフレームを作成
+        # FIXME: iris_dataframe_speciesは他の関数で使う予定がないなら、selfは使わなくてもいいです。
         self.iris_dataframe_species = pd.DataFrame(
             self.iris.data, columns=self.iris.feature_names
         )
@@ -57,6 +68,7 @@ class AnalyzeIris:
         )
 
     def all_supervised(self, n_neighbors=4):
+        #FIXME: 二つのリストにせずに、dictにした方がいいと思います。
         model = [
             LogisticRegression(),
             LinearSVC(),
@@ -80,6 +92,7 @@ class AnalyzeIris:
             "MLPClassifier",
         ]
         # 5分割交差検証
+        # FIXME: 5という数字を変数にして、変更しやすくするといいです。下のプリント文もこの数字に対応させてください。
         kfold = KFold(n_splits=5)
         # iris.get_supervised()での出力結果のために空のデータフレームを作る
         self.iris_supervised = pd.DataFrame()
@@ -123,6 +136,7 @@ class AnalyzeIris:
             "GradientBoostingClassifier",
         ]
         # tree_modelに入っている学習済み分類器はself.supervised_modelの3,6,7番目の要素
+        # supervised_modelがない場合はどうなるのでしょう？モデルの順番が入れ替わってしまったら？この関数は動くのでしょうか
         for model, model_name in zip(
             [
                 self.supervised_model[3],
