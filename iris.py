@@ -79,6 +79,14 @@ class AnalyzeIris:
         """
         return self.iris_df_label
 
+    def get_with_species(self) -> pd.DataFrame:
+        """正解種名付きのirisのデータセットのDataFrameを出力する。
+
+        Returns:
+            pd.DataFrame: 正解種名付きのirisのデータセットのDataFrame
+        """
+        return self.iris_df_species
+
     def get_correlation(self) -> pd.DataFrame:
         """各特徴量ごとの相関係数を求める。
 
@@ -568,16 +576,16 @@ class AnalyzeIris:
             pairs (list[tuple[int, int]], optional): どの特徴量同士を2次元散布図に表示するかを入力. Defaults to [(2, 3)].
         """
         if scaling:
-            X_scaled = StandardScaler().fit_transform(self.data)
+            data_scaled = StandardScaler().fit_transform(self.data)
         else:
-            X_scaled = self.data
+            data_scaled = self.data
         dbscan = DBSCAN(min_samples=min_samples, eps=eps)
         # NOTE:ノイズのクラス分類が
-        clusters = dbscan.fit_predict(X_scaled)
+        clusters = dbscan.fit_predict(data_scaled)
 
         for pair in pairs:
             mglearn.discrete_scatter(
-                X_scaled[:, pair[0]], X_scaled[:, pair[1]], clusters
+                data_scaled[:, pair[0]], data_scaled[:, pair[1]], clusters
             )
             plt.xlabel("Feature " + str(pair[0]))
             plt.ylabel("Feature " + str(pair[1]))
