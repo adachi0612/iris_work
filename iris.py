@@ -12,6 +12,7 @@ import seaborn as sns
 from graphviz import Source
 from seaborn import PairGrid
 from sklearn.base import BaseEstimator
+from sklearn.cluster import DBSCAN, AgglomerativeClustering, KMeans
 
 # 教師あり学習の各手法を読み込む
 from sklearn.datasets import load_iris
@@ -393,12 +394,13 @@ class AnalyzeIris:
         第k主成分までをのヒートマップを作成
 
         Args:
-            n_components (int, optional): _description_. Defaults to 2.
+            n_components (int, optional): PCAの主成分の数を決める. Defaults to 2.
 
         Returns:
-            tuple[pd.DataFrame, pd.DataFrame, PCA]: _description_
+            tuple[pd.DataFrame, pd.DataFrame, PCA]: 標準化したデータと、そのデータをさらに主成分分析で次元削減したデータとその主成分
         """
         # NOTE: 主成分分析で特徴量データの次元削減
+        # NOTE: データを標準化する
         X_scaled = StandardScaler().fit_transform(self.iris_df)
         # NOTE: pd.DataFrame形式に変換する
         X_scaled = pd.DataFrame(X_scaled, columns=self.feature_names)
@@ -408,12 +410,13 @@ class AnalyzeIris:
             columns=["Feature " + str(i) for i in range(n_components)],
         )
         # NOTE: 主成分分析で次元削減をしたデータの2次元散布図を作成
-        mglearn.discrete_scatter(
-            df_pca.iloc[:, 0], df_pca.iloc[:, 1], self.iris_df_label["Label"]
-        )
-        plt.legend(self.target_names, loc="best")
-        plt.xlabel("First component")
-        plt.ylabel("Second component")
+        if n_components > 1:
+            mglearn.discrete_scatter(
+                df_pca.iloc[:, 0], df_pca.iloc[:, 1], self.iris_df_label["Label"]
+            )
+            plt.legend(self.target_names, loc="best")
+            plt.xlabel("First component")
+            plt.ylabel("Second component")
 
         # NOTE: 主成分分析の、第一主成分、第二主成分...をヒートマップで表示
         # NOTE: 自然数の列1,2,3... を 1st 2nd 3rd...と変換するinflectライブラリを使用する
@@ -431,5 +434,108 @@ class AnalyzeIris:
         return X_scaled, df_pca, X_pca
 
     def plot_nmf(self, n_components: int = 2) -> tuple[pd.DataFrame, pd.DataFrame, NMF]:
-        
+        """データセットの特徴量をNMF(非負値行列因子分解)で変換した成分k(k=n_components)までを求め、成分1と2を2次元散布図に描き、
+        成分kまでをのヒートマップを作成
 
+        Args:
+            n_components (int, optional): NMFの求める成分数. Defaults to 2.
+
+        Returns:
+            tuple[pd.DataFrame, pd.DataFrame, NMF]: 標準化したデータと、そのデータをさらにNMFで次元削減したデータとその成分
+        """
+        # NOTE: NMFで特徴量データの次元削減
+        # NOTE: NMFは非負データしか扱えないのでMinMaxScalerでデータを変換する
+        # X_scaled = MinMaxScaler().fit_transform(self.iris_df)
+        # NOTE: pd.DataFrame形式に変換する
+        X_scaled = pd.DataFrame(self.iris_df, columns=self.feature_names)
+        X_nmf = NMF(n_components=n_components).fit(X_scaled)
+        df_nmf = pd.DataFrame(
+            X_nmf.transform(X_scaled),
+            columns=["Component " + str(i) for i in range(n_components)],
+        )
+        # NOTE: NMFで次元削減をしたデータの2次元散布図を作成
+        if n_components > 1:
+            mglearn.discrete_scatter(
+                df_nmf.iloc[:, 0], df_nmf.iloc[:, 1], self.iris_df_label["Label"]
+            )
+            plt.legend(self.target_names, loc="best")
+            plt.xlabel("Component 1")
+            plt.ylabel("Component 2")
+        # NOTE: NMFの、第一主成分、第二主成分...をヒートマップで表示
+        plt.matshow(X_nmf.components_)
+        plt.yticks(range(n_components), list(df_nmf.columns))
+        plt.xticks(range(len(self.feature_names)), self.feature_names)
+        plt.xlabel("Feature")
+        plt.ylabel("NMF components")
+        plt.colorbar()
+
+        return X_scaled, df_nmf, X_nmf
+
+    def plot_tsne(self) -> None:
+        """t-SNEを用いた教師なし学習での分類の2次元散布図での可視化"""
+        tsne = TSNE(random_state=0)
+        X_tsne = tsne.fit_transform(self.data)
+        plt.xlim(X_tsne[:, 0].min() - 1, X_tsne[:, 0].max() + 1)
+        plt.ylim(X_tsne[:, 1].min() - 1, X_tsne[:, 1].max() + 1)
+        for i in range(len(X_tsne[:, 0])):
+            plt.text(
+                X_tsne[i, 0],
+                X_tsne[i, 1],
+                str(self.iris_df_label["Label"][i]),
+                fontdict={"weight": "bold", "size": 9},
+            )
+        plt.xlabel("t-SNE feature0")
+        plt.ylabel("t-SNE feature1")
+
+    def plot_k_means(self, n_clusters: int = 3) -> None:
+        """KMeansでのクラスタリング結果の可視化と、クラスタセンタのプロット、および実際のクラス分類との比較
+
+        Args:
+            n_clusters (int, optional): KMeansのクラスタ数. Defaults to 3.
+        """
+        # NOTE: KMeansでクラスタリングした結果を2次元散布図で表すためにPCAで次元を2まで削減する
+        X_pca = PCA(n_components=2).fit_transform(self.iris_df)
+        kmeans = KMeans(n_clusters=n_clusters, random_state=0)
+        kmeans.fit(X_pca)
+        y_pca = kmeans.predict(X_pca)
+        # NOTE: KMeansで予測したクラスタリング結果を表示
+        print("KMeans法で予測したラベル:\n{}".format(y_pca))
+        markers = ["^", "v", "o"]
+        colors = ["b", "g", "r"]
+        cluster_center_size = 20
+        plt.figure()
+        for i in np.unique(y_pca):
+            plt.scatter(
+                X_pca[y_pca == i, 0],
+                X_pca[y_pca == i, 1],
+                c=colors[i],
+                marker=markers[i],
+            )
+        # NOTE: 各クラスタの重心をプロット
+        plt.plot(
+            kmeans.cluster_centers_[:, 0],
+            kmeans.cluster_centers_[:, 1],
+            c="black",
+            marker="*",
+            markersize=cluster_center_size,
+            linestyle=" ",
+        )
+
+        # NOTE: 元のデータのクラス分類
+        print("実際のラベル:\n{}".format(self.target.to_numpy()))
+        plt.figure()
+        for i in np.unique(self.target):
+            plt.scatter(
+                X_pca[self.target == i, 0],
+                X_pca[self.target == i, 1],
+                c=colors[i],
+                marker=markers[i],
+            )
+        plt.plot(
+            kmeans.cluster_centers_[:, 0],
+            kmeans.cluster_centers_[:, 1],
+            c="black",
+            marker="*",
+            markersize=cluster_center_size,
+            linestyle=" ",
+        )
