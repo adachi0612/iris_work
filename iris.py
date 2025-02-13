@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from graphviz import Source
+from randomcolor import RandomColor
+from scipy.cluster.hierarchy import dendrogram, linkage
 from seaborn import PairGrid
 from sklearn.base import BaseEstimator
 from sklearn.cluster import DBSCAN, AgglomerativeClustering, KMeans
@@ -63,7 +65,7 @@ class AnalyzeIris:
         )
         # DataFrameから特徴量と、正解ラベルの情報を格納する またよく使うものをより簡潔な名前で呼び出せるようにする
         self.data, self.target, self.feature_names, self.target_names = (
-            self.iris_df.loc[:, self.iris.feature_names],
+            self.iris_df,
             self.iris_df_label["Label"],
             self.iris.feature_names,
             self.iris.target_names,
@@ -282,14 +284,14 @@ class AnalyzeIris:
                     Feature_1_name = self.feature_names[Feature_1]
                     # NOTE: 訓練データをプロットする
                     ax.scatter(
-                        self.iris_df.loc[train_index, Feature_0_name],
-                        self.iris_df.loc[train_index, Feature_1_name],
+                        self.data.loc[train_index, Feature_0_name],
+                        self.data.loc[train_index, Feature_1_name],
                         marker="o",
                     )
                     # NOTE:テストデータをプロットする
                     ax.scatter(
-                        self.iris_df.loc[test_index, Feature_0_name],
-                        self.iris_df.loc[test_index, Feature_1_name],
+                        self.data.loc[test_index, Feature_0_name],
+                        self.data.loc[test_index, Feature_1_name],
                         marker="^",
                     )
                     ax.set_xlabel(self.feature_names[Feature_0])
@@ -401,7 +403,7 @@ class AnalyzeIris:
         """
         # NOTE: 主成分分析で特徴量データの次元削減
         # NOTE: データを標準化する
-        X_scaled = StandardScaler().fit_transform(self.iris_df)
+        X_scaled = StandardScaler().fit_transform(self.data)
         # NOTE: pd.DataFrame形式に変換する
         X_scaled = pd.DataFrame(X_scaled, columns=self.feature_names)
         X_pca = PCA(n_components=n_components).fit(X_scaled)
@@ -411,9 +413,7 @@ class AnalyzeIris:
         )
         # NOTE: 主成分分析で次元削減をしたデータの2次元散布図を作成
         if n_components > 1:
-            mglearn.discrete_scatter(
-                df_pca.iloc[:, 0], df_pca.iloc[:, 1], self.iris_df_label["Label"]
-            )
+            mglearn.discrete_scatter(df_pca.iloc[:, 0], df_pca.iloc[:, 1], self.target)
             plt.legend(self.target_names, loc="best")
             plt.xlabel("First component")
             plt.ylabel("Second component")
@@ -445,9 +445,9 @@ class AnalyzeIris:
         """
         # NOTE: NMFで特徴量データの次元削減
         # NOTE: NMFは非負データしか扱えないのでMinMaxScalerでデータを変換する
-        # X_scaled = MinMaxScaler().fit_transform(self.iris_df)
+        # X_scaled = MinMaxScaler().fit_transform(self.data)
         # NOTE: pd.DataFrame形式に変換する
-        X_scaled = pd.DataFrame(self.iris_df, columns=self.feature_names)
+        X_scaled = pd.DataFrame(self.data, columns=self.feature_names)
         X_nmf = NMF(n_components=n_components).fit(X_scaled)
         df_nmf = pd.DataFrame(
             X_nmf.transform(X_scaled),
@@ -455,9 +455,7 @@ class AnalyzeIris:
         )
         # NOTE: NMFで次元削減をしたデータの2次元散布図を作成
         if n_components > 1:
-            mglearn.discrete_scatter(
-                df_nmf.iloc[:, 0], df_nmf.iloc[:, 1], self.iris_df_label["Label"]
-            )
+            mglearn.discrete_scatter(df_nmf.iloc[:, 0], df_nmf.iloc[:, 1], self.target)
             plt.legend(self.target_names, loc="best")
             plt.xlabel("Component 1")
             plt.ylabel("Component 2")
@@ -481,7 +479,7 @@ class AnalyzeIris:
             plt.text(
                 X_tsne[i, 0],
                 X_tsne[i, 1],
-                str(self.iris_df_label["Label"][i]),
+                str(self.target[i]),
                 fontdict={"weight": "bold", "size": 9},
             )
         plt.xlabel("t-SNE feature0")
@@ -494,23 +492,15 @@ class AnalyzeIris:
             n_clusters (int, optional): KMeansのクラスタ数. Defaults to 3.
         """
         # NOTE: KMeansでクラスタリングした結果を2次元散布図で表すためにPCAで次元を2まで削減する
-        X_pca = PCA(n_components=2).fit_transform(self.iris_df)
+        X_pca = PCA(n_components=2).fit_transform(self.data)
         kmeans = KMeans(n_clusters=n_clusters, random_state=0)
         kmeans.fit(X_pca)
         y_pca = kmeans.predict(X_pca)
         # NOTE: KMeansで予測したクラスタリング結果を表示
         print("KMeans法で予測したラベル:\n{}".format(y_pca))
-        markers = ["^", "v", "o"]
-        colors = ["b", "g", "r"]
         cluster_center_size = 20
         plt.figure()
-        for i in np.unique(y_pca):
-            plt.scatter(
-                X_pca[y_pca == i, 0],
-                X_pca[y_pca == i, 1],
-                c=colors[i],
-                marker=markers[i],
-            )
+        mglearn.discrete_scatter(X_pca[:, 0], X_pca[:, 1], y_pca)
         # NOTE: 各クラスタの重心をプロット
         plt.plot(
             kmeans.cluster_centers_[:, 0],
@@ -520,17 +510,12 @@ class AnalyzeIris:
             markersize=cluster_center_size,
             linestyle=" ",
         )
+        plt.show()
 
         # NOTE: 元のデータのクラス分類
         print("実際のラベル:\n{}".format(self.target.to_numpy()))
         plt.figure()
-        for i in np.unique(self.target):
-            plt.scatter(
-                X_pca[self.target == i, 0],
-                X_pca[self.target == i, 1],
-                c=colors[i],
-                marker=markers[i],
-            )
+        mglearn.discrete_scatter(X_pca[:, 0], X_pca[:, 1], self.target.to_numpy())
         plt.plot(
             kmeans.cluster_centers_[:, 0],
             kmeans.cluster_centers_[:, 1],
@@ -539,3 +524,55 @@ class AnalyzeIris:
             markersize=cluster_center_size,
             linestyle=" ",
         )
+        plt.show()
+
+    def plot_dendrogram(
+        self,
+        truncate: bool = False,
+        mode: str = "lastp",
+        p: int = 10,
+        method: str = "ward",
+        metric: str = "euclidean",
+    ) -> None:
+        """凝集型クラスタリングの結果をデンドログラムで表示する
+
+        Args:
+            truncate (bool, optional): デンドログラムの一部だけを見るかどうか . Defaults to False.
+            mode (str, optional): デンドログラムのどの部分までを見るかのメソッド. Defaults to "lastp".
+            p (int, optional): mode="lastp"を選んだときのパラメータ. Defaults to 10.
+            method (str, optional): 連結度を調べる際、どの指標を用いるか. Defaults to "ward".
+            metric (str, optional): どの距離尺度を採用するか. Defaults to "euclidean".
+
+        Returns:
+            _type_: デンドログラムを表示
+        """
+        # NOTE: 凝集型クラスタリングをwardで行った際のブリッジ距離を示す配列を求める
+        linkage_array = linkage(self.data, method=method, metric=metric)
+        if truncate:
+            return dendrogram(linkage_array, truncate_mode=mode, p=p)
+        else:
+            return dendrogram(linkage_array)
+
+    def plot_dbscan(
+        self,
+        scaling: bool = True,
+        eps: float = 0.5,
+        min_samples: int = 5,
+        pairs: list[tuple[int, int]] = [(2, 3)],
+    ) -> None:
+        if scaling:
+            X_scaled = StandardScaler().fit_transform(self.data)
+        else:
+            X_scaled = self.data
+        dbscan = DBSCAN(min_samples=min_samples, eps=eps)
+        # NOTE:ノイズのクラス分類が
+        clusters = dbscan.fit_predict(X_scaled)
+
+        for pair in pairs:
+            mglearn.discrete_scatter(
+                X_scaled[:, pair[0]], X_scaled[:, pair[1]], clusters
+            )
+            plt.xlabel("Feature " + str(pair[0]))
+            plt.ylabel("Feature " + str(pair[1]))
+            plt.show()
+        print("Cluster memberships:\n{}".format(clusters))
