@@ -537,21 +537,20 @@ class AnalyzeIris:
         """凝集型クラスタリングの結果をデンドログラムで表示する
 
         Args:
-            truncate (bool, optional): デンドログラムの一部だけを見るかどうか . Defaults to False.
+            truncate (bool, optional): Trueでデンドログラムの一部だけを見る . Defaults to False.
             mode (str, optional): デンドログラムのどの部分までを見るかのメソッド. Defaults to "lastp".
             p (int, optional): mode="lastp"を選んだときのパラメータ. Defaults to 10.
             method (str, optional): 連結度を調べる際、どの指標を用いるか. Defaults to "ward".
             metric (str, optional): どの距離尺度を採用するか. Defaults to "euclidean".
-
-        Returns:
-            _type_: デンドログラムを表示
         """
         # NOTE: 凝集型クラスタリングをwardで行った際のブリッジ距離を示す配列を求める
         linkage_array = linkage(self.data, method=method, metric=metric)
         if truncate:
-            return dendrogram(linkage_array, truncate_mode=mode, p=p)
+            dendrogram(linkage_array, truncate_mode=mode, p=p)
+            plt.show()
         else:
-            return dendrogram(linkage_array)
+            dendrogram(linkage_array)
+            plt.show()
 
     def plot_dbscan(
         self,
@@ -560,6 +559,14 @@ class AnalyzeIris:
         min_samples: int = 5,
         pairs: list[tuple[int, int]] = [(2, 3)],
     ) -> None:
+        """_summary_
+
+        Args:
+            scaling (bool, optional): Trueで特徴量を標準化する. Defaults to True.
+            eps (float, optional): DBSCANのパラメータ. Defaults to 0.5.
+            min_samples (int, optional): DBSCANのパラメータ. Defaults to 5.
+            pairs (list[tuple[int, int]], optional): どの特徴量同士を2次元散布図に表示するかを入力. Defaults to [(2, 3)].
+        """
         if scaling:
             X_scaled = StandardScaler().fit_transform(self.data)
         else:
