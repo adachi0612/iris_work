@@ -567,7 +567,7 @@ class AnalyzeIris:
         min_samples: int = 5,
         pairs: list[tuple[int, int]] = [(2, 3)],
     ) -> None:
-        """_summary_
+        """DBSCANのクラスタリング結果を、データの２つの特徴量を縦軸と横軸に取った図で可視化する。
 
         Args:
             scaling (bool, optional): Trueで特徴量を標準化する. Defaults to True.
