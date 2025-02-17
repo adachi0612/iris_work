@@ -50,7 +50,7 @@ class AnalyzeIris:
         self.iris = load_iris()
         # FIXME: dataframe はdfと略すことが多いのそちらにしてださい。
         # TODO: コンストラクタでたくさん呼び出していますが、それぞれ用途の使い分けはできているのですか？self.data=self.iris_dfの行はいるのでしょうか？
-        self.iris_df = pd.DataFrame(self.iris.data, columns=self.iris.feature_names)
+        iris_df = pd.DataFrame(self.iris.data, columns=self.iris.feature_names)
         # NOTE: 正解ラベル付きのDataFrameを作成
         self.iris_df_label = pd.DataFrame(
             self.iris.data, columns=self.iris.feature_names
@@ -65,7 +65,7 @@ class AnalyzeIris:
         )
         # DataFrameから特徴量と、正解ラベルの情報を格納する またよく使うものをより簡潔な名前で呼び出せるようにする
         self.data, self.target, self.feature_names, self.target_names = (
-            self.iris_df,
+            iris_df,
             self.iris_df_label["Label"],
             self.iris.feature_names,
             self.iris.target_names,
@@ -93,7 +93,7 @@ class AnalyzeIris:
         Returns:
             pd.DataFrame: 相関係数のDataFrame
         """
-        return self.iris_df.corr()
+        return self.data.corr()
 
     def pair_plot(self, diag_kind: str = "hist") -> PairGrid:
         """seabornライブラリのpairplotメソッドを用いて、各特徴量間の散布図や、ヒストグラムを表示。
@@ -135,7 +135,7 @@ class AnalyzeIris:
         }
         # FIXME: 5という数字を変数にして、変更しやすくするといいです。下のプリント文もこの数字に対応させてください。
         # NOTE: k(=n_splits)分割の交差検証を行う
-        kfold = KFold(n_splits=n_splits)
+        kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
         self.iris_supervised = pd.DataFrame()
         self.supervised_model = []
 
@@ -197,7 +197,7 @@ class AnalyzeIris:
         }
         for i, (model_name, model) in enumerate(tree_models.items()):
             # NOTE: k(=n_splits)分割の交差検証を行う
-            kfold = KFold(n_splits=n_splits)
+            kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
             # FIXME: tree_scoreの型が知りたいです。modelも格納されているとはこの名前ではわかりません。
             tree_score = cross_validate(
                 model, self.data, self.target, cv=kfold, return_estimator=True
@@ -239,171 +239,122 @@ class AnalyzeIris:
             RobustScaler(),
             Normalizer(),
         ),
-    ) -> None:
+    ) -> list[list[float]]:
         """データ前処理(初期値は変換なし, MinMaxScaler, StandardScaler, RobustScaler, Normalizerの5種類)を行い、
         k分割交差検証（初期値はk=5）で分類器の性能を測る
 
         Args:
             n_splits (int, optional): k分割交差検証の分割数. Defaults to 5.
             scalers (tuple[str  |  BaseEstimator, ...], optional): スケール変換の種類を指定. Defaults to ( "Original", MinMaxScaler(), StandardScaler(), RobustScaler(), Normalizer(), ).
-        """
-        # NOTE: k(=n_splits)分割の交差検証を行う
-        kfold = KFold(n_splits=n_splits)
 
+        Returns:
+            list[list[float]]: 変換後の交差検証の各回の訓練データ
+        """
+        train_data = []
+        # NOTE: k(=n_splits)分割の交差検証を行う
+        kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
         linear_svc = LinearSVC()
         # NOTE: 特徴量の名前の組み合わせ（irisのデータセットの場合、4C2で6通り）を作成
         feature_names_combination_list = list(
             itertools.combinations(range(len(self.feature_names)), 2)
         )
         feature_names_combination_len = len(feature_names_combination_list)
-        # NOTE: グラフの間隔を調整するためのパラメーターの設定
-        wspace, hspace = 0.4, 0.3
-
-        # NOTE: "Original"がscalersのタプルに入っている場合
         # FIXME: かなり冗長です。同じ処理は関数にまとめるか、Originalの処理を考え直しましょう。
-        if "Original" in scalers and scalers != ("Original"):
-            for i, (train_index, test_index) in enumerate(
-                kfold.split(self.data, self.target)
-            ):
-
-                fig, axes = plt.subplots(
-                    feature_names_combination_len, len(scalers), figsize=(12, 20)
-                )
-                # NOTE: グラフの間隔を調整する
-                fig.tight_layout()
-                fig.subplots_adjust(wspace=wspace, hspace=hspace)
+        wspace, hspace = 0.3, 0.5
+        # NOTE: データ数や特徴量の数は同じなので、分割の仕方はデータ変換前後でもかわらずこのように書いても良い
+        for i, (train_index, test_index) in enumerate(
+            kfold.split(self.data, self.target)
+        ):
+            fig, axes = plt.subplots(
+                feature_names_combination_len, len(scalers), figsize=(12, 20)
+            )
+            fig.tight_layout()
+            fig.subplots_adjust(wspace=wspace, hspace=hspace)
+            for scaler in scalers:
+                # NOTE:
+                X_scaled, y = self.data.values, self.target
+                # NOTE: scalerが"Original"以外の場合で、データのスケール変換を行う
+                if scaler != "Original":
+                    X_scaled = scaler.fit_transform(X_scaled)
                 scores = cross_validate(
-                    linear_svc,
-                    self.data,
-                    self.target,
-                    cv=kfold,
-                    return_train_score=True,
+                    linear_svc, X_scaled, y, cv=kfold, return_train_score=True
                 )
                 print(
                     "{: <16}: test score: {:.2f} train score: {:.2f}".format(
-                        "Original", scores["test_score"][i], scores["train_score"][i]
+                        str(scaler),
+                        scores["test_score"][i],
+                        scores["train_score"][i],
                     )
                 )
-                # NOTE: "Original"データのスケール変換後の特徴量をプロット
-                for j, (Feature_0, Feature_1) in enumerate(
+                for k, (Feature_0, Feature_1) in enumerate(
                     feature_names_combination_list
                 ):
-                    # NOTE: グラフの位置を求める
-                    ax = axes[j, 0]
-                    # NOTE: 上で求めた異なる2つを取り出す組み合わせの番号と特徴量の名前を対応させる
-                    Feature_0_name = self.feature_names[Feature_0]
-                    Feature_1_name = self.feature_names[Feature_1]
+                    ax = axes[k, scalers.index(scaler)]
                     # NOTE: 訓練データをプロットする
                     ax.scatter(
-                        self.data.loc[train_index, Feature_0_name],
-                        self.data.loc[train_index, Feature_1_name],
+                        X_scaled[train_index, Feature_0],
+                        X_scaled[train_index, Feature_1],
                         marker="o",
                     )
                     # NOTE:テストデータをプロットする
                     ax.scatter(
-                        self.data.loc[test_index, Feature_0_name],
-                        self.data.loc[test_index, Feature_1_name],
+                        X_scaled[test_index, Feature_0],
+                        X_scaled[test_index, Feature_1],
                         marker="^",
                     )
                     ax.set_xlabel(self.feature_names[Feature_0])
                     ax.set_ylabel(self.feature_names[Feature_1])
-                    ax.set_title("Original")
-                # NOTE: 各前処理した後のデータのスケール変換後の特徴量をプロット
-                # FIXME: 1:という数字はOriginal以降のスケーラーに対処するという意味だと思いますが、拡張性が低い実装になっています。Originalが2番目だったら？
-                for scaler in scalers[1:]:
-                    pipe = make_pipeline(scaler, linear_svc)
-                    pipe.fit(self.data, self.target)
-                    scores = cross_validate(
-                        pipe, self.data, self.target, cv=kfold, return_train_score=True
-                    )
-                    # NOTE: スケール変換した特徴量を求める
-                    scaler_data = pipe.named_steps[
-                        scaler.__class__.__name__.lower()
-                    ].transform(self.data)
-                    print(
-                        "{: <16}: test score: {:.2f} train score: {:.2f}".format(
-                            scaler.__class__.__name__,
-                            scores["test_score"][i],
-                            scores["train_score"][i],
-                        )
-                    )
-                    for k, (Feature_0, Feature_1) in enumerate(
-                        feature_names_combination_list
-                    ):
-                        # NOTE: グラフの位置を求める
-                        ax = axes[k, scalers.index(scaler)]
-                        # NOTE: 訓練データをプロットする
-                        ax.scatter(
-                            scaler_data[train_index, Feature_0],
-                            scaler_data[train_index, Feature_1],
-                            marker="o",
-                        )
-                        # NOTE:テストデータをプロットする
-                        ax.scatter(
-                            scaler_data[test_index, Feature_0],
-                            scaler_data[test_index, Feature_1],
-                            marker="^",
-                        )
-                        ax.set_xlabel(self.feature_names[Feature_0])
-                        ax.set_ylabel(self.feature_names[Feature_1])
-                        ax.set_title(scaler.__class__.__name__)
-                plt.show()
-        # NOTE: "Original"のみがscalersのタプルに入っている場合
-        if scalers == ("Original"):
-            print("スケール変換器が必要です.")
-        # NOTE: "Original"がscalersのタプルに入っていない場合
-        elif "Original" not in scalers:
-            for i, (train_index, test_index) in enumerate(
-                kfold.split(self.data, self.target)
-            ):
+                    ax.set_title(str(scaler))
+            plt.show()
+            train_data.append(X_scaled[train_index])
+        return train_data
 
-                fig, axes = plt.subplots(
-                    feature_names_combination_len, len(scalers), figsize=(12, 20)
-                )
-                # NOTE: グラフの間隔を調整する
-                fig.tight_layout()
-                fig.subplots_adjust(wspace=wspace, hspace=hspace)
-                # NOTE: 各前処理した後のデータのスケール変換後の特徴量をプロット
-                for scaler in scalers:
-                    pipe = make_pipeline(scaler, linear_svc)
-                    pipe.fit(self.data, self.target)
-                    scores = cross_validate(
-                        pipe, self.data, self.target, cv=kfold, return_train_score=True
-                    )
-                    # NOTE: スケール変換した特徴量を求める
-                    scaler_data = pipe.named_steps[
-                        scaler.__class__.__name__.lower()
-                    ].transform(self.data)
-                    print(
-                        "{: <16}: test score: {:.2f} train score: {:.2f}".format(
-                            scaler.__class__.__name__,
-                            scores["test_score"][i],
-                            scores["train_score"][i],
-                        )
-                    )
-                    for k, (Feature_0, Feature_1) in enumerate(
-                        feature_names_combination_list
-                    ):
-                        # NOTE: グラフの位置を求める
-                        ax = axes[k, scalers.index(scaler)]
-                        # NOTE: 訓練データをプロットする
-                        ax.scatter(
-                            scaler_data[train_index, Feature_0],
-                            scaler_data[train_index, Feature_1],
-                            marker="o",
-                        )
-                        # NOTE:テストデータをプロットする
-                        ax.scatter(
-                            scaler_data[test_index, Feature_0],
-                            scaler_data[test_index, Feature_1],
-                            marker="^",
-                        )
-                        ax.set_xlabel(self.feature_names[Feature_0])
-                        ax.set_ylabel(self.feature_names[Feature_1])
-                        ax.set_title(scaler.__class__.__name__)
-                plt.show()
+    def plot_decomposition(
+        self, data: pd.DataFrame, Decomposition: BaseEstimator
+    ) -> tuple[pd.DataFrame, BaseEstimator]:
+        """PCAやNMFといった次元削減を行った後に、２次元散布図にデータをプロットする
 
-    def plot_pca(self, n_components: int = 2) -> tuple[pd.DataFrame, pd.DataFrame, PCA]:
+        Args:
+            data (pd.DataFrame): 次元削減と可視化をするデータ
+            Decomposition (BaseEstimator): PCAやNMFなど
+
+        Returns:
+            tuple[pd.DataFrame, BaseEstimator]: 次元削減したデータを格納したデータフレームと、学習済みのモデルを出力、n_componentsが1以下の場合はエラー文を表示
+        """
+        X_decomposition = Decomposition.fit(data)
+        df_decomposition = pd.DataFrame(
+            X_decomposition.transform(data),
+            columns=[
+                str(i + 1) + " " + "Component"
+                for i in range(Decomposition.n_components)
+            ],
+        )
+
+        if Decomposition.n_components > 1:
+            mglearn.discrete_scatter(
+                df_decomposition.iloc[:, 0], df_decomposition.iloc[:, 1], self.target
+            )
+            plt.legend(self.target_names, loc="best")
+            plt.xlabel("Component 1")
+            plt.ylabel("Component 2")
+
+            plt.matshow(X_decomposition.components_)
+            plt.yticks(
+                range(Decomposition.n_components), list(df_decomposition.columns)
+            )
+            plt.xticks(range(len(self.feature_names)), self.feature_names)
+            plt.xlabel("Feature")
+            plt.ylabel(Decomposition.__class__.__name__ + " " + "components")
+            plt.colorbar()
+            return df_decomposition, X_decomposition
+
+        else:
+            print("散布図を作成するために、n_componentsには2以上の値を入力してください")
+            return df_decomposition, X_decomposition
+
+    def plot_pca(
+        self, n_components: int = 2
+    ) -> tuple[pd.DataFrame, pd.DataFrame, BaseEstimator]:
         """データセットの特徴量の、第k主成分(k=n_components)までを求め、第二主成分までを2次元散布図に描き、
         第k主成分までをのヒートマップを作成
 
@@ -411,41 +362,23 @@ class AnalyzeIris:
             n_components (int, optional): PCAの主成分の数を決める. Defaults to 2.
 
         Returns:
-            tuple[pd.DataFrame, pd.DataFrame, PCA]: 標準化したデータと、そのデータをさらに主成分分析で次元削減したデータとその主成分
+            tuple[pd.DataFrame, pd.DataFrame, BaseEstimator]: 標準化したデータと、そのデータをさらに主成分分析で次元削減したデータとその主成分
         """
         # NOTE: 主成分分析で特徴量データの次元削減
         # NOTE: データを標準化する
         X_scaled = StandardScaler().fit_transform(self.data)
         # NOTE: pd.DataFrame形式に変換する
         X_scaled = pd.DataFrame(X_scaled, columns=self.feature_names)
-        X_pca = PCA(n_components=n_components).fit(X_scaled)
-        df_pca = pd.DataFrame(
-            X_pca.transform(X_scaled),
-            columns=["Feature " + str(i) for i in range(n_components)],
-        )
-        # NOTE: 主成分分析で次元削減をしたデータの2次元散布図を作成
-        if n_components > 1:
-            mglearn.discrete_scatter(df_pca.iloc[:, 0], df_pca.iloc[:, 1], self.target)
-            plt.legend(self.target_names, loc="best")
-            plt.xlabel("First component")
-            plt.ylabel("Second component")
 
-        # NOTE: 主成分分析の、第一主成分、第二主成分...をヒートマップで表示
-        # NOTE: 自然数の列1,2,3... を 1st 2nd 3rd...と変換するinflectライブラリを使用する
-        p = inflect.engine()
-        plt.matshow(X_pca.components_)
-        plt.yticks(
-            range(n_components),
-            [p.ordinal(i + 1) + " component" for i in range(n_components)],
+        df_pca, X_pca = self.plot_decomposition(
+            data=X_scaled, Decomposition=PCA(n_components=n_components)
         )
-        plt.xticks(range(len(self.feature_names)), self.feature_names)
-        plt.xlabel("Feature")
-        plt.ylabel("Principal components")
-        plt.colorbar()
 
         return X_scaled, df_pca, X_pca
 
-    def plot_nmf(self, n_components: int = 2) -> tuple[pd.DataFrame, pd.DataFrame, NMF]:
+    def plot_nmf(
+        self, n_components: int = 2
+    ) -> tuple[pd.DataFrame, pd.DataFrame, BaseEstimator]:
         """データセットの特徴量をNMF(非負値行列因子分解)で変換した成分k(k=n_components)までを求め、成分1と2を2次元散布図に描き、
         成分kまでをのヒートマップを作成
 
@@ -453,7 +386,7 @@ class AnalyzeIris:
             n_components (int, optional): NMFの求める成分数. Defaults to 2.
 
         Returns:
-            tuple[pd.DataFrame, pd.DataFrame, NMF]: 標準化したデータと、そのデータをさらにNMFで次元削減したデータとその成分
+            tuple[pd.DataFrame, pd.DataFrame, BaseEstimator]: 標準化したデータと、そのデータをさらにNMFで次元削減したデータとその成分
         """
         # NOTE: NMFで特徴量データの次元削減
         # NOTE: NMFは非負データしか扱えないのでMinMaxScalerでデータを変換する
@@ -461,24 +394,9 @@ class AnalyzeIris:
         # NOTE: pd.DataFrame形式に変換する
         # FIXME: nmfとpcaで同じ処理は関数にまとめるといいです。
         X_scaled = pd.DataFrame(self.data, columns=self.feature_names)
-        X_nmf = NMF(n_components=n_components).fit(X_scaled)
-        df_nmf = pd.DataFrame(
-            X_nmf.transform(X_scaled),
-            columns=["Component " + str(i) for i in range(n_components)],
+        df_nmf, X_nmf = self.plot_decomposition(
+            data=X_scaled, Decomposition=NMF(n_components=n_components)
         )
-        # NOTE: NMFで次元削減をしたデータの2次元散布図を作成
-        if n_components > 1:
-            mglearn.discrete_scatter(df_nmf.iloc[:, 0], df_nmf.iloc[:, 1], self.target)
-            plt.legend(self.target_names, loc="best")
-            plt.xlabel("Component 1")
-            plt.ylabel("Component 2")
-        # NOTE: NMFの、第一主成分、第二主成分...をヒートマップで表示
-        plt.matshow(X_nmf.components_)
-        plt.yticks(range(n_components), list(df_nmf.columns))
-        plt.xticks(range(len(self.feature_names)), self.feature_names)
-        plt.xlabel("Feature")
-        plt.ylabel("NMF components")
-        plt.colorbar()
 
         return X_scaled, df_nmf, X_nmf
 
