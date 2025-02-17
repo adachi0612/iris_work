@@ -49,7 +49,7 @@ class AnalyzeIris:
         """
         self.iris = load_iris()
         # FIXME: dataframe はdfと略すことが多いのそちらにしてださい。
-        # TODO: irisという名前も抽象度が低いので、他の名前の方がいいですが..., お任せします
+        # TODO: コンストラクタでたくさん呼び出していますが、それぞれ用途の使い分けはできているのですか？self.data=self.iris_dfの行はいるのでしょうか？
         self.iris_df = pd.DataFrame(self.iris.data, columns=self.iris.feature_names)
         # NOTE: 正解ラベル付きのDataFrameを作成
         self.iris_df_label = pd.DataFrame(
@@ -120,6 +120,7 @@ class AnalyzeIris:
             n_neighbors (int, optional): k近傍法の、近傍点パラメータ. Defaults to 4.
             n_splits (int, optional): k分割交差検証の分割数. Defaults to 5.
         """
+        # FIXME: LinearSVCが学習されていないバグがありました。確認してください。
         # FIXME: 二つのリストにせずに、dictにした方がいいと思います。
         self.model_collections = {
             "LogisticRegression": LogisticRegression(),
@@ -197,6 +198,7 @@ class AnalyzeIris:
         for i, (model_name, model) in enumerate(tree_models.items()):
             # NOTE: k(=n_splits)分割の交差検証を行う
             kfold = KFold(n_splits=n_splits)
+            # FIXME: tree_scoreの型が知りたいです。modelも格納されているとはこの名前ではわかりません。
             tree_score = cross_validate(
                 model, self.data, self.target, cv=kfold, return_estimator=True
             )
@@ -258,6 +260,7 @@ class AnalyzeIris:
         wspace, hspace = 0.4, 0.3
 
         # NOTE: "Original"がscalersのタプルに入っている場合
+        # FIXME: かなり冗長です。同じ処理は関数にまとめるか、Originalの処理を考え直しましょう。
         if "Original" in scalers and scalers != ("Original"):
             for i, (train_index, test_index) in enumerate(
                 kfold.split(self.data, self.target)
@@ -306,6 +309,7 @@ class AnalyzeIris:
                     ax.set_ylabel(self.feature_names[Feature_1])
                     ax.set_title("Original")
                 # NOTE: 各前処理した後のデータのスケール変換後の特徴量をプロット
+                # FIXME: 1:という数字はOriginal以降のスケーラーに対処するという意味だと思いますが、拡張性が低い実装になっています。Originalが2番目だったら？
                 for scaler in scalers[1:]:
                     pipe = make_pipeline(scaler, linear_svc)
                     pipe.fit(self.data, self.target)
@@ -455,6 +459,7 @@ class AnalyzeIris:
         # NOTE: NMFは非負データしか扱えないのでMinMaxScalerでデータを変換する
         # X_scaled = MinMaxScaler().fit_transform(self.data)
         # NOTE: pd.DataFrame形式に変換する
+        # FIXME: nmfとpcaで同じ処理は関数にまとめるといいです。
         X_scaled = pd.DataFrame(self.data, columns=self.feature_names)
         X_nmf = NMF(n_components=n_components).fit(X_scaled)
         df_nmf = pd.DataFrame(
