@@ -198,7 +198,7 @@ class AnalyzeIris:
         for i, (model_name, model) in enumerate(tree_models.items()):
             # NOTE: k(=n_splits)分割の交差検証を行う
             kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
-            # FIXME: tree_scoreの型が知りたいです。modelも格納されているとはこの名前ではわかりません。
+            # FIXME: tree_scoreの型が知りたいです。modelも格納されているとはこの名前ではわかりません。tree_scores: Dict[str,Any]=cross_validate()のような感じにしてください
             tree_score = cross_validate(
                 model, self.data, self.target, cv=kfold, return_estimator=True
             )
@@ -254,6 +254,13 @@ class AnalyzeIris:
         # NOTE: k(=n_splits)分割の交差検証を行う
         kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
         linear_svc = LinearSVC()
+        """
+        # FIXME: feature_names_combination_list, feature_names_combination_lenは視認性が悪いと思いませんか？
+        例えば、for文で上の変数を使うときに、何で回しているのかわかりにくいです。
+        list_~~, len_~~のようにどのような型なのかを最初に提示すると読む方に負担が少ないです。
+        
+        """
+
         # NOTE: 特徴量の名前の組み合わせ（irisのデータセットの場合、4C2で6通り）を作成
         feature_names_combination_list = list(
             itertools.combinations(range(len(self.feature_names)), 2)
