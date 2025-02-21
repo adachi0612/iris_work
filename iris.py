@@ -48,8 +48,6 @@ class AnalyzeIris:
         正解ラベルや正解種名を追加したDataFrameも作成する。
         """
         self.iris = load_iris()
-        # FIXME: dataframe はdfと略すことが多いのそちらにしてださい。
-        # TODO: コンストラクタでたくさん呼び出していますが、それぞれ用途の使い分けはできているのですか？self.data=self.iris_dfの行はいるのでしょうか？
         iris_df = pd.DataFrame(self.iris.data, columns=self.iris.feature_names)
         # NOTE: 正解ラベル付きのDataFrameを作成
         self.iris_df_label = pd.DataFrame(
@@ -104,7 +102,6 @@ class AnalyzeIris:
         Returns:
             PairGrid: 特徴量間ペアプロット
         """
-        # FIXME: iris_dataframe_speciesは他の関数で使う予定がないなら、selfは使わなくてもいいです。
         return sns.pairplot(
             self.iris_df_species,
             hue="Species",
@@ -120,8 +117,6 @@ class AnalyzeIris:
             n_neighbors (int, optional): k近傍法の、近傍点パラメータ. Defaults to 4.
             n_splits (int, optional): k分割交差検証の分割数. Defaults to 5.
         """
-        # FIXME: LinearSVCが学習されていないバグがありました。確認してください。
-        # FIXME: 二つのリストにせずに、dictにした方がいいと思います。
         self.model_collections = {
             "LogisticRegression": LogisticRegression(),
             "LinearSVC": LinearSVC(),
@@ -133,7 +128,6 @@ class AnalyzeIris:
             "GradientBoostingClassifier": GradientBoostingClassifier(),
             "MLPClassifier": MLPClassifier(),
         }
-        # FIXME: 5という数字を変数にして、変更しやすくするといいです。下のプリント文もこの数字に対応させてください。
         # NOTE: k(=n_splits)分割の交差検証を行う
         kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
         self.iris_supervised = pd.DataFrame()
@@ -188,7 +182,6 @@ class AnalyzeIris:
         Args:
             n_splits (int, optional): k分割交差検証の分割数. Defaults to 5.
         """
-        # supervised_modelがない場合はどうなるのでしょう？モデルの順番が入れ替わってしまったら？この関数は動くのでしょうか
 
         tree_models = {
             "DecisionTreeClassifier": DecisionTreeClassifier(),
@@ -198,8 +191,7 @@ class AnalyzeIris:
         for i, (model_name, model) in enumerate(tree_models.items()):
             # NOTE: k(=n_splits)分割の交差検証を行う
             kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
-            # FIXME: tree_scoreの型が知りたいです。modelも格納されているとはこの名前ではわかりません。tree_scores: Dict[str,Any]=cross_validate()のような感じにしてください
-            tree_score = cross_validate(
+            tree_score: dict[str, Any] = cross_validate(
                 model, self.data, self.target, cv=kfold, return_estimator=True
             )
             # NOTE: 交差検証の訓練データを学習させたモデルを抽出
@@ -254,26 +246,18 @@ class AnalyzeIris:
         # NOTE: k(=n_splits)分割の交差検証を行う
         kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
         linear_svc = LinearSVC()
-        """
-        # FIXME: feature_names_combination_list, feature_names_combination_lenは視認性が悪いと思いませんか？
-        例えば、for文で上の変数を使うときに、何で回しているのかわかりにくいです。
-        list_~~, len_~~のようにどのような型なのかを最初に提示すると読む方に負担が少ないです。
-        
-        """
-
         # NOTE: 特徴量の名前の組み合わせ（irisのデータセットの場合、4C2で6通り）を作成
-        feature_names_combination_list = list(
+        list_feature_names_combination = list(
             itertools.combinations(range(len(self.feature_names)), 2)
         )
-        feature_names_combination_len = len(feature_names_combination_list)
-        # FIXME: かなり冗長です。同じ処理は関数にまとめるか、Originalの処理を考え直しましょう。
+        len_feature_names_combination = len(list_feature_names_combination)
         wspace, hspace = 0.3, 0.5
-        # NOTE: データ数や特徴量の数は同じなので、分割の仕方はデータ変換前後でもかわらずこのように書いても良い
+        # NOTE: データ数や特徴量の数は同じなので、分割の仕方はデータ変換前後でもかわらずこのように書いても良い”
         for i, (train_index, test_index) in enumerate(
             kfold.split(self.data, self.target)
         ):
             fig, axes = plt.subplots(
-                feature_names_combination_len, len(scalers), figsize=(12, 20)
+                len_feature_names_combination, len(scalers), figsize=(12, 20)
             )
             fig.tight_layout()
             fig.subplots_adjust(wspace=wspace, hspace=hspace)
@@ -294,7 +278,7 @@ class AnalyzeIris:
                     )
                 )
                 for k, (Feature_0, Feature_1) in enumerate(
-                    feature_names_combination_list
+                    list_feature_names_combination
                 ):
                     ax = axes[k, scalers.index(scaler)]
                     # NOTE: 訓練データをプロットする
@@ -399,7 +383,6 @@ class AnalyzeIris:
         # NOTE: NMFは非負データしか扱えないのでMinMaxScalerでデータを変換する
         # X_scaled = MinMaxScaler().fit_transform(self.data)
         # NOTE: pd.DataFrame形式に変換する
-        # FIXME: nmfとpcaで同じ処理は関数にまとめるといいです。
         X_scaled = pd.DataFrame(self.data, columns=self.feature_names)
         df_nmf, X_nmf = self.plot_decomposition(
             data=X_scaled, Decomposition=NMF(n_components=n_components)
