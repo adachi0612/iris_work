@@ -129,7 +129,7 @@ class AnalyzeIris:
             "MLPClassifier": MLPClassifier(),
         }
         # NOTE: k(=n_splits)分割の交差検証を行う
-        kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+        kfold = KFold(n_splits=n_splits, shuffle=True, random_state=6)
         self.iris_supervised = pd.DataFrame()
         self.supervised_model = []
 
