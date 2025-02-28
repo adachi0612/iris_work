@@ -62,7 +62,7 @@ class AnalyzeIris:
             self.iris.target_names[i] for i in self.iris.target
         )
         # DataFrameから特徴量と、正解ラベルの情報を格納する またよく使うものをより簡潔な名前で呼び出せるようにする
-        self.data, self.target, self.feature_names, self.target_names = (
+        self.df, self.target, self.feature_names, self.target_names = (
             iris_df,
             self.iris_df_label["Label"],
             self.iris.feature_names,
@@ -91,7 +91,7 @@ class AnalyzeIris:
         Returns:
             pd.DataFrame: 相関係数のDataFrame
         """
-        return self.data.corr()
+        return self.df.corr()
 
     def pair_plot(self, diag_kind: str = "hist") -> PairGrid:
         """seabornライブラリのpairplotメソッドを用いて、各特徴量間の散布図や、ヒストグラムを表示。
@@ -137,7 +137,7 @@ class AnalyzeIris:
             print("=== {} ===".format(model_name))
             score = cross_validate(
                 model,
-                self.data,
+                self.df,
                 self.target,
                 cv=kfold,
                 return_train_score=True,
@@ -192,7 +192,7 @@ class AnalyzeIris:
             # NOTE: k(=n_splits)分割の交差検証を行う
             kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
             tree_score: dict[str, Any] = cross_validate(
-                model, self.data, self.target, cv=kfold, return_estimator=True
+                model, self.df, self.target, cv=kfold, return_estimator=True
             )
             # NOTE: 交差検証の訓練データを学習させたモデルを抽出
             model = tree_score["estimator"][i]
@@ -212,7 +212,7 @@ class AnalyzeIris:
             Source: graphvizを利用して、決定木のクラス分類過程を図示する。
         """
         dot_data = export_graphviz(
-            DecisionTreeClassifier().fit(self.data, self.target),
+            DecisionTreeClassifier().fit(self.df, self.target),
             out_file=None,
             feature_names=self.feature_names,
             class_names=self.target_names,
@@ -247,23 +247,23 @@ class AnalyzeIris:
         kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
         linear_svc = LinearSVC()
         # NOTE: 特徴量の名前の組み合わせ（irisのデータセットの場合、4C2で6通り）を作成
-        list_feature_names_combination = list(
+        list_feature_combination = list(
             itertools.combinations(range(len(self.feature_names)), 2)
         )
-        len_feature_names_combination = len(list_feature_names_combination)
+        len_feature_combination = len(list_feature_combination)
         wspace, hspace = 0.3, 0.5
         # NOTE: データ数や特徴量の数は同じなので、分割の仕方はデータ変換前後でもかわらずこのように書いても良い”
         for i, (train_index, test_index) in enumerate(
-            kfold.split(self.data, self.target)
+            kfold.split(self.df, self.target)
         ):
             fig, axes = plt.subplots(
-                len_feature_names_combination, len(scalers), figsize=(12, 20)
+                len_feature_combination, len(scalers), figsize=(12, 20)
             )
             fig.tight_layout()
             fig.subplots_adjust(wspace=wspace, hspace=hspace)
             for scaler in scalers:
                 # NOTE:
-                X_scaled, y = self.data.values, self.target
+                X_scaled, y = self.df.values, self.target
                 # NOTE: scalerが"Original"以外の場合で、データのスケール変換を行う
                 if scaler != "Original":
                     X_scaled = scaler.fit_transform(X_scaled)
@@ -277,9 +277,7 @@ class AnalyzeIris:
                         scores["train_score"][i],
                     )
                 )
-                for k, (Feature_0, Feature_1) in enumerate(
-                    list_feature_names_combination
-                ):
+                for k, (Feature_0, Feature_1) in enumerate(list_feature_combination):
                     ax = axes[k, scalers.index(scaler)]
                     # NOTE: 訓練データをプロットする
                     ax.scatter(
@@ -357,7 +355,7 @@ class AnalyzeIris:
         """
         # NOTE: 主成分分析で特徴量データの次元削減
         # NOTE: データを標準化する
-        X_scaled = StandardScaler().fit_transform(self.data)
+        X_scaled = StandardScaler().fit_transform(self.df)
         # NOTE: pd.DataFrame形式に変換する
         X_scaled = pd.DataFrame(X_scaled, columns=self.feature_names)
 
@@ -383,7 +381,7 @@ class AnalyzeIris:
         # NOTE: NMFは非負データしか扱えないのでMinMaxScalerでデータを変換する
         # X_scaled = MinMaxScaler().fit_transform(self.data)
         # NOTE: pd.DataFrame形式に変換する
-        X_scaled = pd.DataFrame(self.data, columns=self.feature_names)
+        X_scaled = pd.DataFrame(self.df, columns=self.feature_names)
         df_nmf, X_nmf = self.plot_decomposition(
             data=X_scaled, Decomposition=NMF(n_components=n_components)
         )
@@ -393,7 +391,7 @@ class AnalyzeIris:
     def plot_tsne(self) -> None:
         """t-SNEを用いた教師なし学習での分類の2次元散布図での可視化"""
         tsne = TSNE(random_state=0)
-        X_tsne = tsne.fit_transform(self.data)
+        X_tsne = tsne.fit_transform(self.df)
         plt.xlim(X_tsne[:, 0].min() - 1, X_tsne[:, 0].max() + 1)
         plt.ylim(X_tsne[:, 1].min() - 1, X_tsne[:, 1].max() + 1)
         for i in range(len(X_tsne[:, 0])):
@@ -413,7 +411,7 @@ class AnalyzeIris:
             n_clusters (int, optional): KMeansのクラスタ数. Defaults to 3.
         """
         # NOTE: KMeansでクラスタリングした結果を2次元散布図で表すためにPCAで次元を2まで削減する
-        X_pca = PCA(n_components=2).fit_transform(self.data)
+        X_pca = PCA(n_components=2).fit_transform(self.df)
         kmeans = KMeans(n_clusters=n_clusters, random_state=0)
         kmeans.fit(X_pca)
         y_pca = kmeans.predict(X_pca)
@@ -465,7 +463,7 @@ class AnalyzeIris:
             metric (str, optional): どの距離尺度を採用するか. Defaults to "euclidean".
         """
         # NOTE: 凝集型クラスタリングをwardで行った際のブリッジ距離を示す配列を求める
-        linkage_array = linkage(self.data, method=method, metric=metric)
+        linkage_array = linkage(self.df, method=method, metric=metric)
         if truncate:
             dendrogram(linkage_array, truncate_mode=mode, p=p)
             plt.show()
@@ -489,9 +487,9 @@ class AnalyzeIris:
             pairs (list[tuple[int, int]], optional): どの特徴量同士を2次元散布図に表示するかを入力. Defaults to [(2, 3)].
         """
         if scaling:
-            data_scaled = StandardScaler().fit_transform(self.data)
+            data_scaled = StandardScaler().fit_transform(self.df)
         else:
-            data_scaled = self.data
+            data_scaled = self.df
         dbscan = DBSCAN(min_samples=min_samples, eps=eps)
         # NOTE:ノイズのクラス分類が
         clusters = dbscan.fit_predict(data_scaled)
