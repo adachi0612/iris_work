@@ -31,14 +31,6 @@ from sklearn.svm import SVC, LinearSVC
 from sklearn.tree import DecisionTreeClassifier, export_graphviz
 from sklearn.utils import Bunch
 
-"""
-# TODO:
-# 全体的に、コメントはgoogle Docs形式にして、type hintを追加してください。
-# 課題に入っているREADMEに詳細は書かれています。
-# また、保守や拡張性を考えて実装することを心がけてください。kfold = KFold(n_splits=5)のところなど、数字をベタ書きするのはお勧めしません。
-
-"""
-
 
 class AnalyzeIris:
     """"""
@@ -491,7 +483,6 @@ class AnalyzeIris:
         else:
             data_scaled = self.df
         dbscan = DBSCAN(min_samples=min_samples, eps=eps)
-        # NOTE:ノイズのクラス分類が
         clusters = dbscan.fit_predict(data_scaled)
 
         for pair in pairs:
